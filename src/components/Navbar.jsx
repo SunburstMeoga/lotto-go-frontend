@@ -25,7 +25,8 @@ const Navbar = () => {
           maxWidth: '100vw'
         }}
       >
-      <div className="flex justify-between items-center h-16 px-4">
+      <div className="mobile-container">
+        <div className="flex justify-between items-center h-16 px-4">
           {/* Logo */}
           <div className="flex items-center space-x-3">
             <img
@@ -79,6 +80,7 @@ const Navbar = () => {
               {isConnected ? mockWalletAddress : '连接钱包'}
             </div>
           </div>
+        </div>
       </div>
     </nav>
   );

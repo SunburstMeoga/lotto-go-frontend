@@ -49,13 +49,14 @@ const BottomNav = () => {
         boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.3)'  // 添加阴影效果
       }}
     >
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        height: '100%',
-        padding: '0 16px'
-      }}>
+      <div className="mobile-container">
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          height: '100%',
+          padding: '0 16px'
+        }}>
         {navItems.map((item) => (
           <Link
             key={item.path}
@@ -101,6 +102,7 @@ const BottomNav = () => {
             }}>{item.name}</span>
           </Link>
         ))}
+        </div>
       </div>
     </div>
   );

@@ -776,3 +776,16 @@ html {
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
 }
+
+/* 移动端内容容器 */
+.mobile-container {
+  width: 100%;
+  max-width: 428px;
+  margin: 0 auto;
+}
+
+@media (max-width: 428px) {
+  .mobile-container {
+    max-width: 100%;
+  }
+}

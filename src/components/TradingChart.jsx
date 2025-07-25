@@ -42,8 +42,8 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate }) => {
       // 每秒记录价格历史（用于实时价格线）
       setPriceHistory(prev => {
         const newHistory = [...prev, { time: Date.now(), price: currentPriceRef.current }];
-        // 只保留最近90秒的数据
-        return newHistory.filter(item => Date.now() - item.time < 90000);
+        // 只保留最近60秒的数据
+        return newHistory.filter(item => Date.now() - item.time < 60000);
       });
     }, 1000);
     return () => clearInterval(interval);
@@ -220,7 +220,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate }) => {
       ctx.setLineDash([]);
       ctx.beginPath();
 
-      const timeSpan = 90000; // 90秒
+      const timeSpan = 60000; // 60秒
       const oldestTime = currentTime - timeSpan;
 
       priceHistory.forEach((point, index) => {
