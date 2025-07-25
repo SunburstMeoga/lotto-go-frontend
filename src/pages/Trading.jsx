@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import TradingChart from '../components/TradingChart';
 import CurrencyModal from '../components/CurrencyModal';
 import { usePriceContext } from '../contexts/PriceContext';
+import { generateRealisticHistoricalData, generateTokenHistoricalData } from '../utils/marketDataGenerator';
 
 const Trading = () => {
   const { currentPrice, updatePrice } = usePriceContext();
@@ -68,37 +69,10 @@ const Trading = () => {
     }
   ];
 
-  // 生成模拟K线数据 - 2分钟跨度
-  const generateMockData = (basePriceOverride = null) => {
-    const data = [];
-    // 如果选择了token，使用token的价格作为基础价格
-    let basePrice = basePriceOverride || currentPrice || 118735;
-    const now = Date.now();
-
-    // 根据价格大小调整波动幅度
-    const priceScale = basePrice / 100000; // 基于10万作为基准
-    const volatilityMultiplier = Math.max(0.1, Math.min(2, priceScale)); // 限制在0.1-2倍之间
-
-    // 改为60个数据点，每个数据点间隔2秒，总跨度2分钟
-    for (let i = 60; i >= 0; i--) {
-      const time = now - i * 2000; // 每2秒一个数据点
-      const open = basePrice + (Math.random() - 0.5) * 800 * volatilityMultiplier; // 根据价格调整波动幅度
-      const high = open + Math.random() * 400 * volatilityMultiplier; // 增加高点变化
-      const low = open - Math.random() * 400 * volatilityMultiplier; // 增加低点变化
-      const close = open + (Math.random() - 0.5) * 600 * volatilityMultiplier; // 增加收盘价变化
-
-      data.push({
-        time,
-        open,
-        high,
-        low,
-        close
-      });
-
-      basePrice = close;
-    }
-
-    return data;
+  // 使用新的市场数据生成器
+  const generateRealisticMockData = (basePriceOverride = null) => {
+    const basePrice = basePriceOverride || currentPrice || 118735;
+    return generateRealisticHistoricalData(basePrice, 61, 2000);
   };
 
   // 更新refs
@@ -111,7 +85,7 @@ const Trading = () => {
   useEffect(() => {
     // 只在组件挂载时初始化一次
     if (chartData.length === 0) {
-      const mockData = generateMockData();
+      const mockData = generateRealisticMockData();
       setChartData(mockData);
       const lastPrice = mockData[mockData.length - 1].close;
 
@@ -138,9 +112,23 @@ const Trading = () => {
     // 模拟实时数据更新 - 每1秒更新价格，与K线数据同步
     const interval = setInterval(() => {
       const prevPrice = currentPriceRef.current;
-      const volatility = 50; // 增加波动性，让价格变化更明显
-      const newPrice = prevPrice + (Math.random() - 0.5) * volatility;
-      const finalPrice = Math.max(1000, newPrice); // 确保价格不低于1000
+
+      // 根据价格水平计算合理的波动率
+      let volatilityPercent;
+      if (prevPrice > 50000) {
+        volatilityPercent = 0.0005; // 0.05% - 大价格币种
+      } else if (prevPrice > 1000) {
+        volatilityPercent = 0.001; // 0.1% - 中等价格币种
+      } else if (prevPrice > 10) {
+        volatilityPercent = 0.002; // 0.2% - 小价格币种
+      } else {
+        volatilityPercent = 0.003; // 0.3% - 极小价格币种
+      }
+
+      const maxChange = prevPrice * volatilityPercent;
+      const priceChange = (Math.random() - 0.5) * 2 * maxChange; // -maxChange 到 +maxChange
+      const newPrice = prevPrice + priceChange;
+      const finalPrice = Math.max(prevPrice * 0.99, newPrice); // 确保单次变化不超过1%
 
       // 更新ref
       currentPriceRef.current = finalPrice;
@@ -230,14 +218,44 @@ const Trading = () => {
           const elapsed = Date.now() - trade.startTime;
           if (elapsed >= 60000 && !trade.settled) {
             // 1分钟到了，结算交易
+            // 获取结算时的价格
+            let settlementPrice;
+            if (selectedToken) {
+              settlementPrice = realTimeTokens[selectedToken.id]?.price || selectedToken.price;
+            } else {
+              settlementPrice = currentPriceRef.current;
+            }
+
             const isWin = trade.direction === 'up'
-              ? currentPrice > trade.entryPrice
-              : currentPrice < trade.entryPrice;
+              ? settlementPrice > trade.entryPrice
+              : settlementPrice < trade.entryPrice;
 
             const profit = isWin ? trade.amount * payout : -trade.amount;
             setBalance(prev => prev + profit);
 
-            return { ...trade, settled: true, result: isWin ? 'win' : 'loss', profit };
+            // 输出结算信息到控制台
+            const directionText = trade.direction === 'up' ? '看涨' : '看跌';
+            const priceChange = settlementPrice - trade.entryPrice;
+            const priceChangePercent = (priceChange / trade.entryPrice * 100).toFixed(2);
+
+            console.log(`🏁 交易结算完成！`);
+            console.log(`📊 结算详情:`);
+            console.log(`   - 交易方向: ${directionText}`);
+            console.log(`   - 买入价格: $${trade.entryPrice.toFixed(4)}`);
+            console.log(`   - 结算价格: $${settlementPrice.toFixed(4)}`);
+            console.log(`   - 价格变化: ${priceChange > 0 ? '+' : ''}${priceChange.toFixed(4)} (${priceChangePercent}%)`);
+            console.log(`   - 交易结果: ${isWin ? '✅ 盈利' : '❌ 亏损'}`);
+            console.log(`   - 盈亏金额: ${profit > 0 ? '+' : ''}$${profit}`);
+            console.log(`   - 当前余额: $${balance + profit}`);
+
+            return {
+              ...trade,
+              settled: true,
+              result: isWin ? 'win' : 'loss',
+              profit,
+              settlementPrice,
+              settlementTime: Date.now()
+            };
           }
           return trade;
         }).filter(trade => Date.now() - trade.startTime < 120000); // 2分钟后移除
@@ -249,12 +267,12 @@ const Trading = () => {
 
   const handleTrade = (direction) => {
     if (tradeAmount <= 0) {
-      alert('请输入有效的交易金额');
+      console.log('❌ 交易失败: 请输入有效的交易金额');
       return;
     }
 
     if (balance < tradeAmount) {
-      alert('余额不足');
+      console.log('❌ 交易失败: 余额不足');
       return;
     }
 
@@ -280,9 +298,16 @@ const Trading = () => {
     setActiveTrades(prev => [...prev, newTrade]);
     setBalance(prev => prev - tradeAmount); // 扣除交易金额
 
-    // 简单的成功提示
+    // 输出交易信息到控制台
     const directionText = direction === 'up' ? '看涨' : '看跌';
-    alert(`${directionText} 交易已提交！\n金额: $${tradeAmount}\n入场价格: $${entryPrice.toFixed(1)}\n结算时间: 1分钟`);
+    console.log(`✅ ${directionText} 交易已提交！`);
+    console.log(`📊 交易详情:`);
+    console.log(`   - 方向: ${directionText}`);
+    console.log(`   - 金额: $${tradeAmount}`);
+    console.log(`   - 入场价格: $${entryPrice.toFixed(4)}`);
+    console.log(`   - 结算时间: 1分钟`);
+    console.log(`   - 交易ID: ${newTrade.id}`);
+    console.log(`   - 剩余余额: $${balance - tradeAmount}`);
   };
 
   // 选择 token 处理函数
@@ -292,7 +317,7 @@ const Trading = () => {
 
     // 重新生成基于该token价格的K线数据
     const tokenPrice = realTimeTokens[token.id]?.price || token.price;
-    const newChartData = generateMockData(tokenPrice);
+    const newChartData = generateTokenHistoricalData({ price: tokenPrice, id: token.id });
     setChartData(newChartData);
 
     // 立即更新currentPriceRef为选中token的价格，确保同步
@@ -310,7 +335,7 @@ const Trading = () => {
     setSelectedToken(null);
 
     // 重新生成默认的K线数据
-    const newChartData = generateMockData();
+    const newChartData = generateRealisticMockData();
     setChartData(newChartData);
 
     // 重置为默认价格
