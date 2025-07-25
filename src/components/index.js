@@ -7,3 +7,4 @@ export { default as Navbar } from './Navbar';
 export { default as BottomNav } from './BottomNav';
 export { default as SimpleChart } from './SimpleChart';
 export { default as TradingChart } from './TradingChart';
+export { default as WalletModal } from './WalletModal';

@@ -15,6 +15,7 @@ const Trading = () => {
   const [showTokenList, setShowTokenList] = useState(true); // 默认显示token列表
   const [selectedToken, setSelectedToken] = useState(null);
   const [realTimeTokens, setRealTimeTokens] = useState({}); // 存储实时价格数据
+  const [chartType, setChartType] = useState('candlestick'); // 图表类型：'candlestick' 或 'line'
   const currentPriceRef = useRef(currentPrice); // 用于在定时器中访问最新价格
   const updatePriceRef = useRef(updatePrice); // 用于在定时器中访问最新的updatePrice函数
 
@@ -67,19 +68,19 @@ const Trading = () => {
     }
   ];
 
-  // 生成模拟K线数据 - 缩短时间跨度
+  // 生成模拟K线数据 - 1分钟跨度
   const generateMockData = () => {
     const data = [];
     let basePrice = 118735;
     const now = Date.now();
 
-    // 改为30个数据点，每个数据点间隔30秒，总跨度15分钟
+    // 改为30个数据点，每个数据点间隔2秒，总跨度1分钟
     for (let i = 30; i >= 0; i--) {
-      const time = now - i * 30000; // 每30秒一个数据点
-      const open = basePrice + (Math.random() - 0.5) * 200;
-      const high = open + Math.random() * 100;
-      const low = open - Math.random() * 100;
-      const close = open + (Math.random() - 0.5) * 150;
+      const time = now - i * 2000; // 每2秒一个数据点
+      const open = basePrice + (Math.random() - 0.5) * 800; // 增加价格变化幅度
+      const high = open + Math.random() * 400; // 增加高点变化
+      const low = open - Math.random() * 400; // 增加低点变化
+      const close = open + (Math.random() - 0.5) * 600; // 增加收盘价变化
 
       data.push({
         time,
@@ -132,7 +133,7 @@ const Trading = () => {
     // 模拟实时数据更新 - 每秒更新价格
     const interval = setInterval(() => {
       const prevPrice = currentPriceRef.current;
-      const volatility = 15; // 减小波动性，适合每秒更新
+      const volatility = 50; // 增加波动性，让价格变化更明显
       const newPrice = prevPrice + (Math.random() - 0.5) * volatility;
       const finalPrice = Math.max(1000, newPrice); // 确保价格不低于1000
 
@@ -147,13 +148,13 @@ const Trading = () => {
       updatePriceRef.current(finalPrice, change, changePercent);
     }, 1000); // 改为每秒更新
 
-    // 更新所有token的实时价格 - 每1秒更新一次
+    // 更新所有token的实时价格 - 每2秒更新一次
     const tokenInterval = setInterval(() => {
       setRealTimeTokens(prev => {
         const updated = { ...prev };
         tokenList.forEach(token => {
           const currentData = prev[token.id] || { price: token.price, changePercent: token.changePercent };
-          const volatility = token.price * 0.002; // 0.2% 的波动性
+          const volatility = token.price * 0.01; // 增加到1% 的波动性，让变化更明显
           const priceChange = (Math.random() - 0.5) * volatility;
           const newPrice = Math.max(0.01, currentData.price + priceChange);
           const changePercent = ((newPrice - token.price) / token.price) * 100;
@@ -165,9 +166,9 @@ const Trading = () => {
         });
         return updated;
       });
-    }, 1000); // 每1秒更新一次
+    }, 2000); // 每2秒更新一次
 
-    // 每15秒更新一次K线数据
+    // 每2秒更新一次K线数据
     const candleInterval = setInterval(() => {
       setChartData(prevData => {
         const lastData = prevData[prevData.length - 1];
@@ -175,8 +176,8 @@ const Trading = () => {
         const newCandle = {
           time: Date.now(),
           open: lastData.close,
-          high: Math.max(lastData.close, currentPriceValue) + Math.random() * 20,
-          low: Math.min(lastData.close, currentPriceValue) - Math.random() * 20,
+          high: Math.max(lastData.close, currentPriceValue) + Math.random() * 100, // 增加高点变化
+          low: Math.min(lastData.close, currentPriceValue) - Math.random() * 100, // 增加低点变化
           close: currentPriceValue
         };
 
@@ -184,7 +185,7 @@ const Trading = () => {
         const newData = [...prevData, newCandle];
         return newData.length > 30 ? newData.slice(-30) : newData;
       });
-    }, 15000); // 15秒更新一次
+    }, 2000); // 2秒更新一次
 
     return () => {
       clearInterval(interval);
@@ -408,7 +409,43 @@ const Trading = () => {
             data={chartData}
             currentPrice={selectedToken ? (realTimeTokens[selectedToken.id]?.price || selectedToken.price) : currentPrice}
             activeTrades={activeTrades}
+            chartType={chartType}
           />
+        </div>
+
+        {/* 图表类型切换按钮 */}
+        <div className="flex justify-center py-4 border-b" style={{
+          backgroundColor: 'var(--color-bg-primary)',
+          borderColor: 'var(--color-border)'
+        }}>
+          <div className="flex rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
+            <div
+              onClick={() => setChartType('candlestick')}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-r-lg ${
+                chartType === 'candlestick'
+                  ? 'text-black'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              style={{
+                backgroundColor: chartType === 'candlestick' ? '#eaae36' : 'transparent'
+              }}
+            >
+              K线图
+            </div>
+            <div
+              onClick={() => setChartType('line')}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-l-lg ${
+                chartType === 'line'
+                  ? 'text-black'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              style={{
+                backgroundColor: chartType === 'line' ? '#eaae36' : 'transparent'
+              }}
+            >
+              折线图
+            </div>
+          </div>
         </div>
 
         {/* 底部交易面板 */}
@@ -477,7 +514,7 @@ const Trading = () => {
 
             {/* 交易按钮 */}
             <div className="flex justify-between gap-3 w-full">
-              <button
+              <div
                 onClick={() => handleTrade('up')}
                 className="font-normal py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-white"
                 style={{ backgroundColor: '#10b981', width: '180px' }}
@@ -488,7 +525,7 @@ const Trading = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
                 </svg>
                 <span>Up</span>
-              </button>
+              </div>
 
               <div className="flex flex-col items-center justify-center px-4">
                 <div className="text-gray-400 text-xs">1m</div>
@@ -497,7 +534,7 @@ const Trading = () => {
                 </svg>
               </div>
 
-              <button
+              <div
                 onClick={() => handleTrade('down')}
                 className="font-normal py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-white"
                 style={{ backgroundColor: '#ef4444', width: '180px' }}
@@ -508,7 +545,7 @@ const Trading = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-9.2 9.2M7 7v10h10" />
                 </svg>
                 <span>Down</span>
-              </button>
+              </div>
             </div>
           </div>
         </div>

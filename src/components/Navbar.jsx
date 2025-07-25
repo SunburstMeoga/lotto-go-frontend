@@ -1,17 +1,31 @@
-import { useState } from 'react';
 import useScrollDirection from '../hooks/useScrollDirection';
+import { useWeb3 } from '../hooks/useWeb3';
 
-const Navbar = () => {
-  const [isConnected, setIsConnected] = useState(false);
-
+const Navbar = ({ onWalletModalOpen }) => {
   // 滚动方向检测
   const { isVisible: isNavbarVisible } = useScrollDirection(30);
 
-  // 模拟钱包地址
-  const mockWalletAddress = "0x1234...5678";
+  // Web3钱包功能
+  const {
+    account,
+    isConnecting,
+    connectWallet
+  } = useWeb3();
 
-  const handleWalletClick = () => {
-    setIsConnected(!isConnected);
+  // 格式化钱包地址显示
+  const formatAddress = (address) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const handleWalletClick = async () => {
+    if (account) {
+      // 如果已连接，打开钱包弹窗
+      onWalletModalOpen();
+    } else {
+      // 如果未连接，连接钱包
+      await connectWallet();
+    }
   };
 
   return (
@@ -56,7 +70,7 @@ const Navbar = () => {
                 e.target.style.backgroundColor = 'transparent';
               }}
             >
-              {isConnected ? mockWalletAddress : '连接钱包'}
+              {isConnecting ? '连接中...' : account ? formatAddress(account) : '连接钱包'}
             </div>
           </div>
 
@@ -77,7 +91,7 @@ const Navbar = () => {
                 e.target.style.backgroundColor = 'transparent';
               }}
             >
-              {isConnected ? mockWalletAddress : '连接钱包'}
+              {isConnecting ? '连接中...' : account ? formatAddress(account) : '连接钱包'}
             </div>
           </div>
         </div>

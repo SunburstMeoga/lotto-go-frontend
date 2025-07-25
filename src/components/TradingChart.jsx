@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate }) => {
+const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartType = 'candlestick' }) => {
   const canvasRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -42,7 +42,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate }) => {
       // 每秒记录价格历史（用于实时价格线）
       setPriceHistory(prev => {
         const newHistory = [...prev, { time: Date.now(), price: currentPriceRef.current }];
-        // 只保留最近60秒的数据
+        // 只保留最近60秒的数据（与1分钟K线跨度一致）
         return newHistory.filter(item => Date.now() - item.time < 60000);
       });
     }, 1000);
@@ -134,40 +134,72 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate }) => {
       ctx.stroke();
     }
 
-    // 绘制K线（只在左侧2/3区域）
+    // 绘制图表（只在左侧2/3区域）
     const candleWidth = Math.max(1, klineWidth / data.length * 0.6);
     const candleSpacing = klineWidth / data.length;
 
-    data.forEach((candle, index) => {
-      const x = index * candleSpacing + candleSpacing / 2;
-      
-      // 计算Y坐标
-      const openY = chartTop + chartHeight - ((candle.open - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
-      const closeY = chartTop + chartHeight - ((candle.close - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
-      const highY = chartTop + chartHeight - ((candle.high - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
-      const lowY = chartTop + chartHeight - ((candle.low - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+    if (chartType === 'candlestick') {
+      // 绘制K线图
+      data.forEach((candle, index) => {
+        const x = index * candleSpacing + candleSpacing / 2;
 
-      const isGreen = candle.close > candle.open;
-      
-      // 绘制影线
-      ctx.strokeStyle = isGreen ? '#00ff88' : '#ff4444';
-      ctx.lineWidth = 1;
+        // 计算Y坐标
+        const openY = chartTop + chartHeight - ((candle.open - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+        const closeY = chartTop + chartHeight - ((candle.close - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+        const highY = chartTop + chartHeight - ((candle.high - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+        const lowY = chartTop + chartHeight - ((candle.low - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+
+        const isGreen = candle.close > candle.open;
+
+        // 绘制影线
+        ctx.strokeStyle = isGreen ? '#00ff88' : '#ff4444';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, highY);
+        ctx.lineTo(x, lowY);
+        ctx.stroke();
+
+        // 绘制实体
+        ctx.fillStyle = isGreen ? '#00ff88' : '#ff4444';
+        const bodyTop = Math.min(openY, closeY);
+        const bodyHeight = Math.abs(closeY - openY);
+
+        if (bodyHeight < 1) {
+          ctx.fillRect(x - candleWidth / 2, bodyTop - 0.5, candleWidth, 1);
+        } else {
+          ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+        }
+      });
+    } else if (chartType === 'line') {
+      // 绘制折线图
+      ctx.strokeStyle = '#00bcd4';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(x, highY);
-      ctx.lineTo(x, lowY);
+
+      data.forEach((candle, index) => {
+        const x = index * candleSpacing + candleSpacing / 2;
+        const closeY = chartTop + chartHeight - ((candle.close - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+
+        if (index === 0) {
+          ctx.moveTo(x, closeY);
+        } else {
+          ctx.lineTo(x, closeY);
+        }
+      });
+
       ctx.stroke();
 
-      // 绘制实体
-      ctx.fillStyle = isGreen ? '#00ff88' : '#ff4444';
-      const bodyTop = Math.min(openY, closeY);
-      const bodyHeight = Math.abs(closeY - openY);
-      
-      if (bodyHeight < 1) {
-        ctx.fillRect(x - candleWidth / 2, bodyTop - 0.5, candleWidth, 1);
-      } else {
-        ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-      }
-    });
+      // 在折线图上添加数据点
+      data.forEach((candle, index) => {
+        const x = index * candleSpacing + candleSpacing / 2;
+        const closeY = chartTop + chartHeight - ((candle.close - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+
+        ctx.fillStyle = '#00bcd4';
+        ctx.beginPath();
+        ctx.arc(x, closeY, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
 
     // 绘制当前价格线
     if (currentPrice) {
