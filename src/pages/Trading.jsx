@@ -15,7 +15,7 @@ const Trading = () => {
   const [showTokenList, setShowTokenList] = useState(true); // 默认显示token列表
   const [selectedToken, setSelectedToken] = useState(null);
   const [realTimeTokens, setRealTimeTokens] = useState({}); // 存储实时价格数据
-  const [chartType, setChartType] = useState('candlestick'); // 图表类型：'candlestick' 或 'line'
+  const [chartType, setChartType] = useState('line'); // 图表类型：'candlestick' 或 'line' - 默认为折线图
   const currentPriceRef = useRef(currentPrice); // 用于在定时器中访问最新价格
   const updatePriceRef = useRef(updatePrice); // 用于在定时器中访问最新的updatePrice函数
 
@@ -68,19 +68,24 @@ const Trading = () => {
     }
   ];
 
-  // 生成模拟K线数据 - 1分钟跨度
-  const generateMockData = () => {
+  // 生成模拟K线数据 - 2分钟跨度
+  const generateMockData = (basePriceOverride = null) => {
     const data = [];
-    let basePrice = 118735;
+    // 如果选择了token，使用token的价格作为基础价格
+    let basePrice = basePriceOverride || currentPrice || 118735;
     const now = Date.now();
 
-    // 改为30个数据点，每个数据点间隔2秒，总跨度1分钟
-    for (let i = 30; i >= 0; i--) {
+    // 根据价格大小调整波动幅度
+    const priceScale = basePrice / 100000; // 基于10万作为基准
+    const volatilityMultiplier = Math.max(0.1, Math.min(2, priceScale)); // 限制在0.1-2倍之间
+
+    // 改为60个数据点，每个数据点间隔2秒，总跨度2分钟
+    for (let i = 60; i >= 0; i--) {
       const time = now - i * 2000; // 每2秒一个数据点
-      const open = basePrice + (Math.random() - 0.5) * 800; // 增加价格变化幅度
-      const high = open + Math.random() * 400; // 增加高点变化
-      const low = open - Math.random() * 400; // 增加低点变化
-      const close = open + (Math.random() - 0.5) * 600; // 增加收盘价变化
+      const open = basePrice + (Math.random() - 0.5) * 800 * volatilityMultiplier; // 根据价格调整波动幅度
+      const high = open + Math.random() * 400 * volatilityMultiplier; // 增加高点变化
+      const low = open - Math.random() * 400 * volatilityMultiplier; // 增加低点变化
+      const close = open + (Math.random() - 0.5) * 600 * volatilityMultiplier; // 增加收盘价变化
 
       data.push({
         time,
@@ -130,7 +135,7 @@ const Trading = () => {
       setRealTimeTokens(initialTokenData);
     }
 
-    // 模拟实时数据更新 - 每秒更新价格
+    // 模拟实时数据更新 - 每1秒更新价格，与K线数据同步
     const interval = setInterval(() => {
       const prevPrice = currentPriceRef.current;
       const volatility = 50; // 增加波动性，让价格变化更明显
@@ -146,7 +151,7 @@ const Trading = () => {
 
       // 更新价格上下文
       updatePriceRef.current(finalPrice, change, changePercent);
-    }, 1000); // 改为每秒更新
+    }, 1000); // 改为每1秒更新价格，与K线数据同步
 
     // 更新所有token的实时价格 - 每2秒更新一次
     const tokenInterval = setInterval(() => {
@@ -163,29 +168,52 @@ const Trading = () => {
             price: newPrice,
             changePercent: changePercent
           };
+
+          // 如果当前选中的是这个token，同时更新currentPriceRef
+          if (selectedToken && selectedToken.id === token.id) {
+            currentPriceRef.current = newPrice;
+            // 同时更新价格上下文
+            const change = newPrice - currentData.price;
+            const changePercentForContext = (change / currentData.price) * 100;
+            updatePriceRef.current(newPrice, change, changePercentForContext);
+          }
         });
         return updated;
       });
-    }, 2000); // 每2秒更新一次
+    }, 1000); // 每1秒更新一次
 
-    // 每2秒更新一次K线数据
+    // 每1秒更新一次K线数据
     const candleInterval = setInterval(() => {
       setChartData(prevData => {
         const lastData = prevData[prevData.length - 1];
-        const currentPriceValue = currentPriceRef.current; // 使用ref获取最新价格
+
+        // 获取当前应该显示的价格（与价格信息栏保持一致）
+        let currentPriceValue;
+        if (selectedToken) {
+          // 如果选择了token，使用token的实时价格
+          currentPriceValue = realTimeTokens[selectedToken.id]?.price || selectedToken.price;
+        } else {
+          // 如果没有选择token，使用默认价格
+          currentPriceValue = currentPriceRef.current;
+        }
+
+        // 根据当前价格调整波动幅度
+        const priceScale = currentPriceValue / 100000; // 基于10万作为基准
+        const volatilityMultiplier = Math.max(0.1, Math.min(2, priceScale)); // 限制在0.1-2倍之间
+
         const newCandle = {
           time: Date.now(),
           open: lastData.close,
-          high: Math.max(lastData.close, currentPriceValue) + Math.random() * 100, // 增加高点变化
-          low: Math.min(lastData.close, currentPriceValue) - Math.random() * 100, // 增加低点变化
+          high: Math.max(lastData.close, currentPriceValue) + Math.random() * 100 * volatilityMultiplier, // 根据价格调整波动
+          low: Math.min(lastData.close, currentPriceValue) - Math.random() * 100 * volatilityMultiplier, // 根据价格调整波动
           close: currentPriceValue
         };
 
-        // 保持最近30个数据点
+        // 保持最近60个数据点（2分钟数据）
         const newData = [...prevData, newCandle];
-        return newData.length > 30 ? newData.slice(-30) : newData;
+        return newData.length > 60 ? newData.slice(-60) : newData;
       });
-    }, 2000); // 2秒更新一次
+    }, 1000); // 1秒更新一次
 
     return () => {
       clearInterval(interval);
@@ -230,12 +258,21 @@ const Trading = () => {
       return;
     }
 
-    // 创建新交易
+    // 创建新交易 - 使用与价格信息栏一致的价格
+    let entryPrice;
+    if (selectedToken) {
+      // 如果选择了token，使用token的实时价格
+      entryPrice = realTimeTokens[selectedToken.id]?.price || selectedToken.price;
+    } else {
+      // 如果没有选择token，使用当前价格
+      entryPrice = currentPriceRef.current;
+    }
+
     const newTrade = {
       id: Date.now(),
       direction,
       amount: tradeAmount,
-      entryPrice: currentPrice,
+      entryPrice: entryPrice,
       startTime: Date.now(),
       settled: false
     };
@@ -245,19 +282,41 @@ const Trading = () => {
 
     // 简单的成功提示
     const directionText = direction === 'up' ? '看涨' : '看跌';
-    alert(`${directionText} 交易已提交！\n金额: $${tradeAmount}\n入场价格: $${currentPrice.toFixed(1)}\n结算时间: 1分钟`);
+    alert(`${directionText} 交易已提交！\n金额: $${tradeAmount}\n入场价格: $${entryPrice.toFixed(1)}\n结算时间: 1分钟`);
   };
 
   // 选择 token 处理函数
   const handleTokenSelect = (token) => {
     setSelectedToken(token);
     setShowTokenList(false);
+
+    // 重新生成基于该token价格的K线数据
+    const tokenPrice = realTimeTokens[token.id]?.price || token.price;
+    const newChartData = generateMockData(tokenPrice);
+    setChartData(newChartData);
+
+    // 立即更新currentPriceRef为选中token的价格，确保同步
+    currentPriceRef.current = tokenPrice;
+
+    // 更新价格上下文
+    const tokenData = realTimeTokens[token.id] || { price: token.price, changePercent: token.changePercent };
+    const change = tokenData.price - token.price;
+    updatePriceRef.current(tokenPrice, change, tokenData.changePercent);
   };
 
   // 返回 token 列表
   const handleBackToTokenList = () => {
     setShowTokenList(true);
     setSelectedToken(null);
+
+    // 重新生成默认的K线数据
+    const newChartData = generateMockData();
+    setChartData(newChartData);
+
+    // 重置为默认价格
+    const defaultPrice = newChartData[newChartData.length - 1].close;
+    currentPriceRef.current = defaultPrice;
+    updatePriceRef.current(defaultPrice, 0, 0);
   };
 
   // 渲染 token 列表
@@ -413,7 +472,8 @@ const Trading = () => {
           />
         </div>
 
-        {/* 图表类型切换按钮 */}
+        {/* 图表类型切换按钮 - 暂时隐藏，只显示折线图 */}
+        {/*
         <div className="flex justify-center py-4 border-b" style={{
           backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)'
@@ -447,6 +507,7 @@ const Trading = () => {
             </div>
           </div>
         </div>
+        */}
 
         {/* 底部交易面板 */}
         <div className="border-t p-4 w-full" style={{
