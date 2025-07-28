@@ -13,8 +13,16 @@ const Trading = () => {
   const [balance, setBalance] = useState(1000); // 初始余额1000
   const [selectedCurrency, setSelectedCurrency] = useState('USDT');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
-  const [showTokenList, setShowTokenList] = useState(true); // 默认显示token列表
-  const [selectedToken, setSelectedToken] = useState(null);
+  const [showTokenList, setShowTokenList] = useState(false); // 暂时隐藏token列表
+  const [selectedToken, setSelectedToken] = useState({
+    id: 'BTC',
+    name: 'BTC-USD',
+    icon: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1.png',
+    price: 115773.26,
+    change: 0,
+    changePercent: 0,
+    payout: 175
+  }); // 默认选择BTC
   const [realTimeTokens, setRealTimeTokens] = useState({}); // 存储实时价格数据
   const [chartType, setChartType] = useState('line'); // 图表类型：'candlestick' 或 'line' - 默认为折线图
   const currentPriceRef = useRef(currentPrice); // 用于在定时器中访问最新价格
@@ -98,14 +106,13 @@ const Trading = () => {
       updatePriceRef.current(lastPrice, change, changePercent);
       currentPriceRef.current = lastPrice; // 初始化ref
 
-      // 初始化实时token数据
-      const initialTokenData = {};
-      tokenList.forEach(token => {
-        initialTokenData[token.id] = {
-          price: token.price,
-          changePercent: token.changePercent
-        };
-      });
+      // 初始化BTC实时数据
+      const initialTokenData = {
+        'BTC': {
+          price: selectedToken.price,
+          changePercent: selectedToken.changePercent
+        }
+      };
       setRealTimeTokens(initialTokenData);
     }
 
@@ -141,31 +148,28 @@ const Trading = () => {
       updatePriceRef.current(finalPrice, change, changePercent);
     }, 1000); // 改为每1秒更新价格，与K线数据同步
 
-    // 更新所有token的实时价格 - 每2秒更新一次
+    // 更新BTC的实时价格 - 每1秒更新一次
     const tokenInterval = setInterval(() => {
       setRealTimeTokens(prev => {
         const updated = { ...prev };
-        tokenList.forEach(token => {
-          const currentData = prev[token.id] || { price: token.price, changePercent: token.changePercent };
-          const volatility = token.price * 0.01; // 增加到1% 的波动性，让变化更明显
-          const priceChange = (Math.random() - 0.5) * volatility;
-          const newPrice = Math.max(0.01, currentData.price + priceChange);
-          const changePercent = ((newPrice - token.price) / token.price) * 100;
+        const currentData = prev['BTC'] || { price: selectedToken.price, changePercent: selectedToken.changePercent };
+        const volatility = selectedToken.price * 0.01; // 1% 的波动性
+        const priceChange = (Math.random() - 0.5) * volatility;
+        const newPrice = Math.max(0.01, currentData.price + priceChange);
+        const changePercent = ((newPrice - selectedToken.price) / selectedToken.price) * 100;
 
-          updated[token.id] = {
-            price: newPrice,
-            changePercent: changePercent
-          };
+        updated['BTC'] = {
+          price: newPrice,
+          changePercent: changePercent
+        };
 
-          // 如果当前选中的是这个token，同时更新currentPriceRef
-          if (selectedToken && selectedToken.id === token.id) {
-            currentPriceRef.current = newPrice;
-            // 同时更新价格上下文
-            const change = newPrice - currentData.price;
-            const changePercentForContext = (change / currentData.price) * 100;
-            updatePriceRef.current(newPrice, change, changePercentForContext);
-          }
-        });
+        // 更新currentPriceRef
+        currentPriceRef.current = newPrice;
+        // 同时更新价格上下文
+        const change = newPrice - currentData.price;
+        const changePercentForContext = (change / currentData.price) * 100;
+        updatePriceRef.current(newPrice, change, changePercentForContext);
+
         return updated;
       });
     }, 1000); // 每1秒更新一次
@@ -416,15 +420,7 @@ const Trading = () => {
         {/* 价格信息栏 */}
         <div className="flex items-center justify-between p-4 border-b border-gray-800 w-full" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
           <div className="flex items-center">
-            {!showTokenList && (
-              <div
-                onClick={handleBackToTokenList}
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:opacity-80"
-                style={{ backgroundColor: 'var(--color-bg-secondary)', color: 'white', fontSize: '16px', marginRight: '12px' }}
-              >
-                ←
-              </div>
-            )}
+
             {selectedToken && (
               <div className="flex items-center">
                 <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0" style={{ marginRight: '12px' }}>

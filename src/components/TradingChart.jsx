@@ -5,7 +5,22 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
   const animationFrameRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [priceHistory, setPriceHistory] = useState([]);
+  const [priceHistory, setPriceHistory] = useState(() => {
+    // 基于图表的时间范围初始化历史数据点
+    const now = Date.now();
+    const timeSpan = 90000; // 90秒历史数据
+    const intervalMs = 1000; // 每1秒一个点，与实际更新频率一致
+    const pointCount = Math.floor(timeSpan / intervalMs); // 90个点
+
+    const initialHistory = [];
+    for (let i = pointCount; i >= 0; i--) {
+      initialHistory.push({
+        time: now - (i * intervalMs), // 每1秒一个点，往前90秒
+        price: currentPrice + (Math.random() - 0.5) * currentPrice * 0.01 // 在当前价格基础上小幅波动
+      });
+    }
+    return initialHistory;
+  });
   const [realTimePrices, setRealTimePrices] = useState([]); // 实时价格数据，每秒更新
   const currentPriceRef = useRef(currentPrice); // 用于在定时器中访问最新价格
 
@@ -43,7 +58,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
     const animate = (timestamp) => {
       setCurrentTime(timestamp);
 
-      // 每秒更新一次价格历史和实时价格数据
+      // 每1秒更新一次价格历史，确保每秒刷新一次最新价格
       if (timestamp - lastPriceUpdateTime >= 1000) {
         const now = Date.now();
 
@@ -155,7 +170,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
     // 绘制价格网格线和标签
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 1;
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = '#8A7D6A';
     ctx.font = '11px Arial';
 
     for (let i = 0; i <= 8; i++) {
@@ -184,68 +199,102 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
 
     // 绘制左侧历史数据区域（使用实时价格历史轨迹）
     if (chartType === 'line' && priceHistory.length > 1) {
-      // 使用实时价格历史数据绘制折线图
-      ctx.strokeStyle = '#00bcd4';
-      ctx.lineWidth = 2;
+      // 创建折线渐变色
+      const lineGradient = ctx.createLinearGradient(0, 0, historyZoneWidth, 0);
+      lineGradient.addColorStop(0, '#D25868');
+      lineGradient.addColorStop(0.2, '#CECFF7');
+      lineGradient.addColorStop(0.4, '#C290E4');
+      lineGradient.addColorStop(0.6, '#D25868');
+      lineGradient.addColorStop(0.8, '#C290E4');
+      lineGradient.addColorStop(1, '#78C9C9');
+
+      ctx.strokeStyle = lineGradient;
+      ctx.lineWidth = 2; // 增加线宽到2px，更平滑
+      ctx.lineCap = 'round'; // 圆角线条
+      ctx.lineJoin = 'round'; // 圆角连接
       ctx.beginPath();
 
       const now = Date.now();
       const timeSpan = 90000; // 90秒历史数据
 
-      priceHistory.forEach((point, index) => {
-        // 计算时间位置
+      // 过滤有效的价格历史点
+      const validPoints = priceHistory.filter(point => {
         const timeFromStart = point.time - (now - timeSpan);
-        if (timeFromStart >= 0) {
+        return timeFromStart >= 0;
+      });
+
+      if (validPoints.length > 1) {
+        // 使用贝塞尔曲线绘制更平滑的线条
+        const points = validPoints.map(point => {
+          const timeFromStart = point.time - (now - timeSpan);
           const timeProgress = timeFromStart / timeSpan;
           const x = timeProgress * historyZoneWidth;
           const y = chartTop + chartHeight - ((point.price - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+          return { x, y };
+        });
 
-          if (index === 0 || timeFromStart === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
+        // 开始绘制平滑曲线
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 1; i < points.length - 1; i++) {
+          const currentPoint = points[i];
+          const nextPoint = points[i + 1];
+
+          // 计算控制点，使曲线更平滑
+          const controlPointX = currentPoint.x + (nextPoint.x - currentPoint.x) * 0.5;
+          const controlPointY = currentPoint.y;
+
+          ctx.quadraticCurveTo(controlPointX, controlPointY,
+                              currentPoint.x + (nextPoint.x - currentPoint.x) * 0.5,
+                              currentPoint.y + (nextPoint.y - currentPoint.y) * 0.5);
         }
-      });
 
-      ctx.stroke();
+        // 绘制最后一段
+        if (points.length > 1) {
+          const lastPoint = points[points.length - 1];
+          const secondLastPoint = points[points.length - 2];
+          ctx.quadraticCurveTo(secondLastPoint.x, secondLastPoint.y, lastPoint.x, lastPoint.y);
+        }
+
+        ctx.stroke();
+      }
 
       // 添加折线图下方的渐变填充
-      ctx.save();
+      if (validPoints.length > 0) {
+        ctx.save();
 
-      // 创建渐变（从折线到底部）
-      const gradient = ctx.createLinearGradient(0, chartTop, 0, chartTop + chartHeight);
-      gradient.addColorStop(0, 'rgba(0, 188, 212, 0.3)'); // 顶部：30%透明度
-      gradient.addColorStop(0.5, 'rgba(0, 188, 212, 0.15)'); // 中间：15%透明度
-      gradient.addColorStop(1, 'rgba(0, 188, 212, 0.05)'); // 底部：5%透明度
+        // 创建渐变（从折线到底部）- 使用更深的颜色方案
+        const gradient = ctx.createLinearGradient(0, chartTop, 0, chartTop + chartHeight);
+        gradient.addColorStop(0, 'rgba(99, 103, 149, 0.8)'); // 顶部：更深的透明度
+        gradient.addColorStop(0.5, 'rgba(246, 161, 156, 0.4)'); // 中间：更深的透明度
+        gradient.addColorStop(1, 'rgba(246, 161, 156, 0.1)'); // 底部：更深的透明度
 
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
 
-      // 重新绘制折线路径用于填充
-      priceHistory.forEach((point, index) => {
-        const timeFromStart = point.time - (now - timeSpan);
-        if (timeFromStart >= 0) {
+        // 重新绘制折线路径用于填充
+        let isFirstFillPoint = true;
+        validPoints.forEach((point) => {
+          const timeFromStart = point.time - (now - timeSpan);
           const timeProgress = timeFromStart / timeSpan;
           const x = timeProgress * historyZoneWidth;
           const y = chartTop + chartHeight - ((point.price - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
 
-          if (index === 0 || timeFromStart === 0) {
+          if (isFirstFillPoint) {
             ctx.moveTo(x, y);
+            isFirstFillPoint = false;
           } else {
             ctx.lineTo(x, y);
           }
-        }
-      });
+        });
 
-      // 连接到底部形成封闭区域
-      if (priceHistory.length > 0) {
-        const lastValidPoint = priceHistory.filter(p => p.time - (now - timeSpan) >= 0).pop();
-        const firstValidPoint = priceHistory.find(p => p.time - (now - timeSpan) >= 0);
+        // 连接到底部形成封闭区域
+        if (validPoints.length > 0) {
+          const lastPoint = validPoints[validPoints.length - 1];
+          const firstPoint = validPoints[0];
 
-        if (lastValidPoint && firstValidPoint) {
-          const lastTimeProgress = (lastValidPoint.time - (now - timeSpan)) / timeSpan;
-          const firstTimeProgress = (firstValidPoint.time - (now - timeSpan)) / timeSpan;
+          const lastTimeProgress = (lastPoint.time - (now - timeSpan)) / timeSpan;
+          const firstTimeProgress = (firstPoint.time - (now - timeSpan)) / timeSpan;
           const lastX = lastTimeProgress * historyZoneWidth;
           const firstX = firstTimeProgress * historyZoneWidth;
 
@@ -253,25 +302,12 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
           ctx.lineTo(firstX, chartTop + chartHeight); // 左下角
           ctx.closePath();
         }
+
+        ctx.fill();
+        ctx.restore();
       }
 
-      ctx.fill();
-      ctx.restore();
-
-      // 在折线图上添加数据点
-      priceHistory.forEach((point) => {
-        const timeFromStart = point.time - (now - timeSpan);
-        if (timeFromStart >= 0) {
-          const timeProgress = timeFromStart / timeSpan;
-          const x = timeProgress * historyZoneWidth;
-          const y = chartTop + chartHeight - ((point.price - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
-
-          ctx.fillStyle = '#00bcd4';
-          ctx.beginPath();
-          ctx.arc(x, y, 2, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-      });
+      // 不再显示历史数据点，只保留线条
     } else if (chartType === 'candlestick' && data && data.length > 0) {
       // K线图模式 - 保持原有逻辑
       const candleWidth = Math.max(1, historyZoneWidth / data.length * 0.6);
@@ -289,7 +325,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
         const isGreen = candle.close > candle.open;
 
         // 绘制影线
-        ctx.strokeStyle = isGreen ? '#00ff88' : '#ff4444';
+        ctx.strokeStyle = isGreen ? '#10D184' : '#BD2338';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(x, highY);
@@ -297,7 +333,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
         ctx.stroke();
 
         // 绘制实体
-        ctx.fillStyle = isGreen ? '#00ff88' : '#ff4444';
+        ctx.fillStyle = isGreen ? '#10D184' : '#BD2338';
         const bodyTop = Math.min(openY, closeY);
         const bodyHeight = Math.abs(closeY - openY);
 
@@ -358,8 +394,8 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
     const currentPriceValue = currentPriceRef.current;
     const priceY = chartTop + chartHeight - ((currentPriceValue - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
 
-    // 金色虚线（延伸到整个图表区域包括预测区）
-    ctx.strokeStyle = '#eaae36';
+    // 当前价位横虚线（延伸到整个图表区域包括预测区）
+    ctx.strokeStyle = '#CBAD83';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
@@ -375,8 +411,25 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
 
     // 当前价格点位置（应该与折线图最新点重合）
     let currentPriceX;
-    if (data && data.length > 0) {
-      // 计算最新数据点的X位置
+    if (chartType === 'line' && priceHistory.length > 0) {
+      // 折线图模式：当前价格点应该与最新的价格历史点位置一致
+      const now = Date.now();
+      const timeSpan = 90000; // 90秒历史数据
+      const latestPoint = priceHistory[priceHistory.length - 1];
+
+      if (latestPoint) {
+        const timeFromStart = latestPoint.time - (now - timeSpan);
+        if (timeFromStart >= 0) {
+          const timeProgress = timeFromStart / timeSpan;
+          currentPriceX = timeProgress * historyZoneWidth;
+        } else {
+          currentPriceX = historyZoneWidth;
+        }
+      } else {
+        currentPriceX = historyZoneWidth;
+      }
+    } else if (data && data.length > 0) {
+      // K线图模式：计算最新数据点的X位置
       const candleSpacing = historyZoneWidth / data.length;
       currentPriceX = (data.length - 1) * candleSpacing + candleSpacing / 2;
     } else {
@@ -386,7 +439,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
 
     // 外圈光晕
     const glowGradient = ctx.createRadialGradient(currentPriceX, priceY, 0, currentPriceX, priceY, pulseRadius + 6);
-    glowGradient.addColorStop(0, `rgba(234, 174, 54, ${pulseAlpha * 0.8})`);
+    glowGradient.addColorStop(0, `rgba(203, 173, 131, ${pulseAlpha * 0.8})`);
     glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = glowGradient;
     ctx.beginPath();
@@ -394,7 +447,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
     ctx.fill();
 
     // 主实心圆
-    ctx.fillStyle = `rgba(234, 174, 54, ${pulseAlpha})`;
+    ctx.fillStyle = `rgba(203, 173, 131, ${pulseAlpha})`;
     ctx.beginPath();
     ctx.arc(currentPriceX, priceY, pulseRadius, 0, 2 * Math.PI);
     ctx.fill();
@@ -414,7 +467,7 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
     const labelX = totalChartWidth + 5; // 紧贴图表右边
 
     // 绘制圆角价格标签背景
-    ctx.fillStyle = '#eaae36';
+    ctx.fillStyle = '#CBAD83';
     ctx.beginPath();
     const radius = 4;
     ctx.moveTo(labelX + radius, priceY - labelHeight/2);
@@ -594,47 +647,52 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
       let mainColor;
       if (isSettled) {
         // 已结算：显示输赢状态
-        mainColor = isWin ? '#10b981' : '#ef4444';
+        mainColor = isWin ? '#10D184' : '#BD2338';
       } else {
         // 进行中：显示方向
-        mainColor = isUp ? '#10b981' : '#ef4444';
+        mainColor = isUp ? '#10D184' : '#BD2338';
       }
 
 
 
-      // 买入点使用固定大小，不需要脉冲效果
-      const baseRadius = 12;
+      // 买入点使用固定大小，缩小一半
+      const baseRadius = 6;
 
-      // 计算结算时间位置（基于实时价格历史）
-      const settlementTimeFromStart = tradeEndTime - (now - timeSpan);
+      // 计算结算线位置 - 从最右边开始向左移动，按秒为单位
+      const tradeElapsedTime = now - tradeStartTime; // 交易已经过去的时间
+      const tradeDuration = 60000; // 1分钟交易时长
+      const remainingTime = tradeDuration - tradeElapsedTime; // 剩余时间
+
       let settlementX;
 
-      if (settlementTimeFromStart >= 0 && settlementTimeFromStart <= timeSpan) {
-        // 结算时间在历史数据范围内
-        const settlementTimeProgress = settlementTimeFromStart / timeSpan;
-        settlementX = settlementTimeProgress * historyZoneWidth;
+      if (remainingTime > 0) {
+        // 交易进行中：结算线从图表最右边向左移动
+        // 按秒为单位计算位置，避免每帧都移动
+        const elapsedSeconds = Math.floor(tradeElapsedTime / 1000); // 已过去的秒数
+        const totalSeconds = 60; // 总共60秒
+        const timeProgress = elapsedSeconds / totalSeconds; // 0到1的进度，按秒计算
+        const totalDistance = totalChartWidth - historyZoneWidth; // 需要移动的总距离
+        settlementX = totalChartWidth - (timeProgress * totalDistance); // 从最右边向左移动
       } else {
-        // 结算时间在预测区域内
-        const timeFromHistoryEnd = tradeEndTime - now;
-        const predictionProgress = Math.min(1, Math.max(0, timeFromHistoryEnd / 30000)); // 30秒预测区
-        settlementX = historyZoneWidth + (predictionProgress * predictionZoneWidth);
+        // 交易结算：结算线到达历史区域右边界
+        settlementX = historyZoneWidth;
       }
 
-      // 只在交易进行中显示买入价格线和结算时间线
-      if (!isSettled) {
-        // 先绘制买入价格标记线 - 直线，从买入点到结算点
-        ctx.strokeStyle = trade.direction === 'up' ? '#10b981' : '#ef4444';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([]); // 改为直线，不是虚线
+      // 只在交易进行中且在开盘时间内显示结算时间线和连接线
+      const isWithinTradingTime = currentTime < tradeEndTime; // 在结算时间之前
 
-        // 从买入点右侧到结算点
+      if (!isSettled && isWithinTradingTime) {
+        // 绘制买入点和结算竖线之间的连接线 - 颜色根据up/down决定
+        ctx.strokeStyle = trade.direction === 'up' ? '#10D184' : '#BD2338';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(startX + baseRadius + 5, entryPriceY);
+        ctx.moveTo(startX, entryPriceY);
         ctx.lineTo(settlementX, entryPriceY);
         ctx.stroke();
 
-        // 绘制结算时间虚线（与当前价格线一致的粗细）
-        ctx.strokeStyle = trade.direction === 'up' ? '#10b981' : '#ef4444';
+        // 绘制结算时间虚线 - 固定颜色 #CBAD83，从交易提交开始就往左边移动
+        ctx.strokeStyle = '#CBAD83';
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
@@ -642,237 +700,164 @@ const TradingChart = ({ data, currentPrice, activeTrades, onPriceUpdate, chartTy
         ctx.lineTo(settlementX, chartTop + chartHeight);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        // 绘制买入点和结算竖线的相交点 - 圆点，颜色根据up/down决定
+        const intersectionX = settlementX;
+        const intersectionY = entryPriceY;
+        const intersectionRadius = 4;
+
+        // 绘制相交点圆形
+        ctx.fillStyle = trade.direction === 'up' ? '#10D184' : '#BD2338';
+        ctx.beginPath();
+        ctx.arc(intersectionX, intersectionY, intersectionRadius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // 绘制相交点边框
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(intersectionX, intersectionY, intersectionRadius, 0, 2 * Math.PI);
+        ctx.stroke();
       }
 
-      // 重新绘制买入点色块（在横线之后，确保层级正确）
-      // 绘制外圈光晕
-      const gradient = ctx.createRadialGradient(startX, entryPriceY, 0, startX, entryPriceY, baseRadius + 8);
-      gradient.addColorStop(0, trade.direction === 'up' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(startX, entryPriceY, baseRadius + 8, 0, 2 * Math.PI);
-      ctx.fill();
+      // 只在交易进行中且在开盘时间内绘制买入点
+      if (!isSettled && isWithinTradingTime) {
+        // 绘制外圈光晕
+        const gradient = ctx.createRadialGradient(startX, entryPriceY, 0, startX, entryPriceY, baseRadius + 8);
+        gradient.addColorStop(0, trade.direction === 'up' ? 'rgba(16, 209, 132, 0.3)' : 'rgba(189, 35, 56, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(startX, entryPriceY, baseRadius + 8, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // 绘制阴影
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-      ctx.beginPath();
-      ctx.arc(startX + 2, entryPriceY + 2, baseRadius, 0, 2 * Math.PI);
-      ctx.fill();
+        // 绘制阴影
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.arc(startX + 2, entryPriceY + 2, baseRadius, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // 绘制主圆圈
-      ctx.fillStyle = mainColor;
-      ctx.beginPath();
-      ctx.arc(startX, entryPriceY, baseRadius, 0, 2 * Math.PI);
-      ctx.fill();
+        // 绘制主圆圈
+        ctx.fillStyle = mainColor;
+        ctx.beginPath();
+        ctx.arc(startX, entryPriceY, baseRadius, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // 绘制内圈渐变
-      const innerGradient = ctx.createRadialGradient(
-        startX - 3, entryPriceY - 3, 0,
-        startX, entryPriceY, baseRadius
-      );
-      innerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-      innerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      ctx.fillStyle = innerGradient;
-      ctx.beginPath();
-      ctx.arc(startX, entryPriceY, baseRadius, 0, 2 * Math.PI);
-      ctx.fill();
+        // 绘制内圈渐变
+        const innerGradient = ctx.createRadialGradient(
+          startX - 3, entryPriceY - 3, 0,
+          startX, entryPriceY, baseRadius
+        );
+        innerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+        innerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = innerGradient;
+        ctx.beginPath();
+        ctx.arc(startX, entryPriceY, baseRadius, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // 绘制边框
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(startX, entryPriceY, baseRadius, 0, 2 * Math.PI);
-      ctx.stroke();
-
-      // 绘制三角形图标 - 使用黑色
-      ctx.fillStyle = '#000000';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      if (isUp) {
-        // 向上三角形 - 更精致的形状
-        ctx.moveTo(startX, entryPriceY - 7);
-        ctx.lineTo(startX - 6, entryPriceY + 5);
-        ctx.lineTo(startX + 6, entryPriceY + 5);
-      } else {
-        // 向下三角形 - 更精致的形状
-        ctx.moveTo(startX, entryPriceY + 7);
-        ctx.lineTo(startX - 6, entryPriceY - 5);
-        ctx.lineTo(startX + 6, entryPriceY - 5);
+        // 绘制白色三角形图标
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (isUp) {
+          // 向上三角形 - 调整大小适应小圆圈
+          ctx.moveTo(startX, entryPriceY - 4);
+          ctx.lineTo(startX - 3, entryPriceY + 2);
+          ctx.lineTo(startX + 3, entryPriceY + 2);
+        } else {
+          // 向下三角形 - 调整大小适应小圆圈
+          ctx.moveTo(startX, entryPriceY + 4);
+          ctx.lineTo(startX - 3, entryPriceY - 2);
+          ctx.lineTo(startX + 3, entryPriceY - 2);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
       }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
 
-      // 如果交易已结算，添加结算点指示器
-      if (isSettled) {
-        // 计算结算点位置（基于实时价格历史）
-        let settlementX;
-        let settlementPriceY;
+      // 如果交易已结算或者开盘时间已到，在折线图上显示结算信息
+      if (isSettled || !isWithinTradingTime) {
+        // 获取结算价格
         let settlementPrice = trade.settlementPrice || currentPriceRef.current;
 
-        const settlementTimeFromStart = tradeEndTime - (now - timeSpan);
+        // 尝试找到结算时间附近的价格历史点
+        let closestSettlementPoint = null;
+        let minSettlementTimeDiff = Infinity;
 
-        if (settlementTimeFromStart >= 0 && settlementTimeFromStart <= timeSpan) {
-          // 结算时间在历史数据范围内
-          const settlementTimeProgress = settlementTimeFromStart / timeSpan;
-          settlementX = settlementTimeProgress * historyZoneWidth;
-
-          // 尝试找到结算时间附近的价格历史点
-          let closestSettlementPoint = null;
-          let minSettlementTimeDiff = Infinity;
-
-          priceHistory.forEach((point) => {
-            const timeDiff = Math.abs(point.time - tradeEndTime);
-            if (timeDiff < minSettlementTimeDiff) {
-              minSettlementTimeDiff = timeDiff;
-              closestSettlementPoint = point;
-            }
-          });
-
-          if (closestSettlementPoint) {
-            settlementPrice = closestSettlementPoint.price;
+        priceHistory.forEach((point) => {
+          const timeDiff = Math.abs(point.time - tradeEndTime);
+          if (timeDiff < minSettlementTimeDiff) {
+            minSettlementTimeDiff = timeDiff;
+            closestSettlementPoint = point;
           }
-        } else {
-          // 结算时间在预测区域内
-          const timeFromHistoryEnd = tradeEndTime - now;
-          const predictionProgress = Math.min(1, Math.max(0, timeFromHistoryEnd / 30000));
-          settlementX = historyZoneWidth + (predictionProgress * predictionZoneWidth);
+        });
+
+        if (closestSettlementPoint) {
+          settlementPrice = closestSettlementPoint.price;
         }
 
-        settlementPriceY = chartTop + chartHeight - ((settlementPrice - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+        // 计算结算点在折线图上的位置
+        // X位置：基于结算时间在历史数据中的位置
+        const now = Date.now();
+        const timeSpan = 90000; // 90秒历史数据
+        const settlementTimeFromStart = tradeEndTime - (now - timeSpan);
 
-        // 判断价格升降
-        const priceChange = (settlementPrice > actualEntryPrice) ? 'up' : 'down';
-        const changeColor = priceChange === 'up' ? '#10b981' : '#ef4444';
+        let settlementX;
+        if (settlementTimeFromStart >= 0 && settlementTimeFromStart <= timeSpan) {
+          // 结算时间在历史数据范围内
+          const timeProgress = settlementTimeFromStart / timeSpan;
+          settlementX = timeProgress * historyZoneWidth;
+        } else {
+          // 如果结算时间不在历史范围内，放在历史区域右边界
+          settlementX = historyZoneWidth;
+        }
 
-        // 绘制结算点
-        ctx.fillStyle = changeColor;
+        // Y位置：基于结算价格
+        const settlementPriceY = chartTop + chartHeight - ((settlementPrice - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+
+        // 使用交易对象中已经计算好的盈亏信息
+        const isWin = trade.result === 'win';
+
+        // 绘制结算点 - 圆形背景色根据up/down决定
+        const settlementRadius = 8;
+        ctx.fillStyle = trade.direction === 'up' ? '#10D184' : '#BD2338';
         ctx.beginPath();
-        ctx.arc(settlementX, settlementPriceY, 8, 0, 2 * Math.PI);
+        ctx.arc(settlementX, settlementPriceY, settlementRadius, 0, 2 * Math.PI);
         ctx.fill();
 
         // 绘制结算点边框
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(settlementX, settlementPriceY, 8, 0, 2 * Math.PI);
+        ctx.arc(settlementX, settlementPriceY, settlementRadius, 0, 2 * Math.PI);
         ctx.stroke();
 
-        // 绘制升降三角形（黑色）
+        // 绘制中间的黑色三角形
         ctx.fillStyle = '#000000';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 1;
         ctx.beginPath();
-        if (priceChange === 'up') {
+        if (trade.direction === 'up') {
           // 向上三角形
-          ctx.moveTo(settlementX, settlementPriceY - 5);
-          ctx.lineTo(settlementX - 4, settlementPriceY + 3);
-          ctx.lineTo(settlementX + 4, settlementPriceY + 3);
+          ctx.moveTo(settlementX, settlementPriceY - 4);
+          ctx.lineTo(settlementX - 3, settlementPriceY + 2);
+          ctx.lineTo(settlementX + 3, settlementPriceY + 2);
         } else {
           // 向下三角形
-          ctx.moveTo(settlementX, settlementPriceY + 5);
-          ctx.lineTo(settlementX - 4, settlementPriceY - 3);
-          ctx.lineTo(settlementX + 4, settlementPriceY - 3);
+          ctx.moveTo(settlementX, settlementPriceY + 4);
+          ctx.lineTo(settlementX - 3, settlementPriceY - 2);
+          ctx.lineTo(settlementX + 3, settlementPriceY - 2);
         }
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
-
-        // 连接买入点和结算点的线
-        ctx.strokeStyle = changeColor;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([2, 2]);
-        ctx.beginPath();
-        ctx.moveTo(startX, entryPriceY);
-        ctx.lineTo(settlementX, settlementPriceY);
-        ctx.stroke();
-        ctx.setLineDash([]);
       }
 
-      // 绘制价格标签 - 修复：让价格文字在色块内居中
-      const priceText = trade.entryPrice.toFixed(1);
 
-      // 计算文字宽度以确定标签大小
-      ctx.font = 'bold 10px Arial';
-      const textWidth = ctx.measureText(priceText).width;
-      const labelWidth = Math.max(50, textWidth + 16); // 最小50px，或文字宽度+16px padding
-      const labelHeight = 20;
-      const radius = 8;
 
-      // 标签位置：从买入点右侧开始，确保有足够间距
-      const labelX = startX + baseRadius + 10;
-      const labelY = entryPriceY;
 
-      // 标签背景 - 手动绘制圆角矩形
-      ctx.fillStyle = mainColor;
-      ctx.beginPath();
-      ctx.moveTo(labelX + radius, labelY - labelHeight/2);
-      ctx.lineTo(labelX + labelWidth - radius, labelY - labelHeight/2);
-      ctx.quadraticCurveTo(labelX + labelWidth, labelY - labelHeight/2, labelX + labelWidth, labelY - labelHeight/2 + radius);
-      ctx.lineTo(labelX + labelWidth, labelY + labelHeight/2 - radius);
-      ctx.quadraticCurveTo(labelX + labelWidth, labelY + labelHeight/2, labelX + labelWidth - radius, labelY + labelHeight/2);
-      ctx.lineTo(labelX + radius, labelY + labelHeight/2);
-      ctx.quadraticCurveTo(labelX, labelY + labelHeight/2, labelX, labelY + labelHeight/2 - radius);
-      ctx.lineTo(labelX, labelY - labelHeight/2 + radius);
-      ctx.quadraticCurveTo(labelX, labelY - labelHeight/2, labelX + radius, labelY - labelHeight/2);
-      ctx.closePath();
-      ctx.fill();
-
-      // 价格文字 - 在色块中心
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 10px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(priceText, labelX + labelWidth/2, labelY + 3);
-
-      // 连接线
-      ctx.strokeStyle = mainColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(startX + baseRadius, entryPriceY);
-      ctx.lineTo(labelX, labelY);
-      ctx.stroke();
-
-      // 绘制交点闪光小点 - 优化：流畅的闪光效果
-      const intersectionX = settlementX;
-      const intersectionY = entryPriceY;
-
-      // 只在交易进行中时显示闪光效果
-      if (!trade.settled) {
-        // 使用更流畅的动画时间计算（基于requestAnimationFrame的currentTime）
-        const animationTime = currentTime * 0.003; // 减慢动画速度，使其更流畅
-        const pulseAlpha = 0.7 + 0.3 * Math.sin(animationTime); // 0.7-1.0之间平滑脉冲
-        const pulseRadius = 3.5 + 1.5 * Math.sin(animationTime * 1.2); // 3.5-5px之间平滑脉冲
-        const glowRadius = 6 + 2 * Math.sin(animationTime * 0.8); // 外圈光晕也有动画
-
-        // 外圈光晕 - 更大的光晕效果
-        const glowGradient = ctx.createRadialGradient(intersectionX, intersectionY, 0, intersectionX, intersectionY, glowRadius);
-        glowGradient.addColorStop(0, trade.direction === 'up' ? `rgba(16, 185, 129, ${pulseAlpha * 0.6})` : `rgba(239, 68, 68, ${pulseAlpha * 0.6})`);
-        glowGradient.addColorStop(0.7, trade.direction === 'up' ? `rgba(16, 185, 129, ${pulseAlpha * 0.3})` : `rgba(239, 68, 68, ${pulseAlpha * 0.3})`);
-        glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = glowGradient;
-        ctx.beginPath();
-        ctx.arc(intersectionX, intersectionY, glowRadius, 0, 2 * Math.PI);
-        ctx.fill();
-
-        // 主闪光点
-        ctx.fillStyle = trade.direction === 'up' ? `rgba(16, 185, 129, ${pulseAlpha})` : `rgba(239, 68, 68, ${pulseAlpha})`;
-        ctx.beginPath();
-        ctx.arc(intersectionX, intersectionY, pulseRadius, 0, 2 * Math.PI);
-        ctx.fill();
-
-        // 内部高亮点 - 添加轻微的偏移以增加立体感
-        const highlightOffset = 0.5;
-        ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha * 0.9})`;
-        ctx.beginPath();
-        ctx.arc(intersectionX - highlightOffset, intersectionY - highlightOffset, pulseRadius * 0.35, 0, 2 * Math.PI);
-        ctx.fill();
-      }
     });
 
     // 绘制时间轴标签 - 整个图表只显示7个时间标签
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = '#8A7D6A';
     ctx.font = '10px Arial';
     ctx.textAlign = 'center';
 

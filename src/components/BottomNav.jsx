@@ -67,7 +67,7 @@ const BottomNav = () => {
               alignItems: 'center',
               justifyContent: 'center',
               padding: '8px 12px',
-              color: isActive(item.path) ? '#eaae36' : '#8f8f8f',
+              color: isActive(item.path) ? '#FF6600' : '#8f8f8f',
               textDecoration: 'none',
               minWidth: '60px',
               transition: 'color 0.2s ease'
@@ -91,14 +91,14 @@ const BottomNav = () => {
           >
             <div style={{
               marginBottom: '4px',
-              color: isActive(item.path) ? '#eaae36' : '#8f8f8f'
+              color: isActive(item.path) ? '#FF6600' : '#8f8f8f'
             }}>
               {item.icon}
             </div>
             <span style={{
               fontSize: '12px',
               fontWeight: 'normal',
-              color: isActive(item.path) ? '#eaae36' : '#8f8f8f'
+              color: isActive(item.path) ? '#FF6600' : '#8f8f8f'
             }}>{item.name}</span>
           </Link>
         ))}
