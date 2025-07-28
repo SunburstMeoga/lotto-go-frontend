@@ -1,6 +1,6 @@
 const Account = () => {
   return (
-    <div 
+    <div
       className="min-h-screen text-white p-4 pb-20"
       style={{ backgroundColor: 'var(--color-bg-primary)' }}
     >
@@ -8,7 +8,7 @@ const Account = () => {
         <h1 className="text-2xl font-normal mb-6" style={{ color: 'var(--color-text-primary)' }}>
           账户
         </h1>
-        
+
         <div className="text-center py-20">
           <div className="text-gray-400 mb-4">
             <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

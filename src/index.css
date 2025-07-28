@@ -19,6 +19,25 @@ body {
   font-weight: 400; /* 设置默认字体粗细为normal */
 }
 
+/* 隐藏number输入框的箭头 */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* 设置所有输入框的光标颜色为橙色 */
+input[type="text"],
+input[type="number"],
+input {
+  caret-color: #FF6600;
+}
+
 /* 自定义滑块样式 */
 .slider {
   -webkit-appearance: none;
@@ -88,7 +107,7 @@ html {
   --color-accent: #eaae36;
   --color-accent-hover: #d49c2e;
   --color-accent-light: #f4c247;
-  --color-text-primary: #ffffff;
+  --color-text-primary: #FFFFFF;
   --color-text-secondary: #b3b3b3;
   --color-text-muted: #666666;
   --color-border: #333333;
@@ -106,6 +125,11 @@ html {
   --color-secondary-700: #0369a1;
   --color-secondary-800: #075985;
   --color-secondary-900: #0c4a6e;
+
+  /* 响应式变量 */
+  --scale: 1;
+  --design-width: 390px;
+  --viewport-width: 100vw;
 }
 
 /* 通用工具类 */
@@ -515,15 +539,18 @@ html {
 }
 
 .shadow-md {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .shadow-xl {
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .shadow-2xl {
@@ -541,7 +568,8 @@ html {
 }
 
 .transition-colors {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-property: color, background-color, border-color,
+    text-decoration-color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
@@ -576,9 +604,12 @@ html {
 }
 
 .focus\:ring-2:focus {
-  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
-  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
-  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0
+    var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0
+    calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow),
+    var(--tw-shadow, 0 0 #0000);
 }
 
 .focus\:ring-offset-2:focus {
@@ -633,27 +664,142 @@ html {
   background: linear-gradient(135deg, #ace0f9 0%, #7dd3fc 50%, #38bdf8 100%);
 }
 
+/* 响应式工具类 */
+.responsive-container {
+  width: 100%;
+  max-width: var(--design-width);
+  margin: 0 auto;
+  background-color: var(--color-bg-primary);
+  min-height: 100vh;
+}
+
+.responsive-page-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #000000;
+  display: flex;
+  justify-content: center;
+}
+
+/* 响应式字体大小 */
+.text-responsive-xs {
+  font-size: calc(12px * var(--scale));
+}
+
+.text-responsive-sm {
+  font-size: calc(14px * var(--scale));
+}
+
+.text-responsive-base {
+  font-size: calc(16px * var(--scale));
+}
+
+.text-responsive-lg {
+  font-size: calc(18px * var(--scale));
+}
+
+.text-responsive-xl {
+  font-size: calc(20px * var(--scale));
+}
+
+.text-responsive-2xl {
+  font-size: calc(24px * var(--scale));
+}
+
+.text-responsive-3xl {
+  font-size: calc(30px * var(--scale));
+}
+
+/* 响应式间距 */
+.p-responsive-1 {
+  padding: calc(4px * var(--scale));
+}
+
+.p-responsive-2 {
+  padding: calc(8px * var(--scale));
+}
+
+.p-responsive-3 {
+  padding: calc(12px * var(--scale));
+}
+
+.p-responsive-4 {
+  padding: calc(16px * var(--scale));
+}
+
+.p-responsive-6 {
+  padding: calc(24px * var(--scale));
+}
+
+.p-responsive-8 {
+  padding: calc(32px * var(--scale));
+}
+
+.m-responsive-1 {
+  margin: calc(4px * var(--scale));
+}
+
+.m-responsive-2 {
+  margin: calc(8px * var(--scale));
+}
+
+.m-responsive-3 {
+  margin: calc(12px * var(--scale));
+}
+
+.m-responsive-4 {
+  margin: calc(16px * var(--scale));
+}
+
+.m-responsive-6 {
+  margin: calc(24px * var(--scale));
+}
+
+.m-responsive-8 {
+  margin: calc(32px * var(--scale));
+}
+
 .text-gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary-600), var(--color-secondary-600));
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-600),
+    var(--color-secondary-600)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .btn-gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-500));
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-500),
+    var(--color-secondary-500)
+  );
 }
 
 .btn-gradient-primary:hover {
-  background: linear-gradient(135deg, var(--color-primary-600), var(--color-secondary-600));
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-600),
+    var(--color-secondary-600)
+  );
 }
 
 .btn-gradient-secondary {
-  background: linear-gradient(135deg, var(--color-secondary-500), var(--color-primary-500));
+  background: linear-gradient(
+    135deg,
+    var(--color-secondary-500),
+    var(--color-primary-500)
+  );
 }
 
 .btn-gradient-secondary:hover {
-  background: linear-gradient(135deg, var(--color-secondary-600), var(--color-primary-600));
+  background: linear-gradient(
+    135deg,
+    var(--color-secondary-600),
+    var(--color-primary-600)
+  );
 }
 
 .text-primary-600 {
@@ -788,4 +934,54 @@ html {
   .mobile-container {
     max-width: 100%;
   }
+}
+
+/* Send系列弹窗增强阴影效果 */
+.send-modal-shadow {
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.4),
+    0 15px 30px rgba(0, 0, 0, 0.3),
+    0 10px 20px rgba(0, 0, 0, 0.2),
+    0 5px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 弹窗切换动画 */
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+}
+
+.modal-enter {
+  animation: modal-fade-in 0.3s ease-out forwards;
+}
+
+.modal-exit {
+  animation: modal-fade-out 0.2s ease-in forwards;
+}
+
+/* 弹窗高度变化动画 */
+.modal-height-transition {
+  transition: height 0.3s ease-in-out, max-height 0.3s ease-in-out;
+}
+
+/* 弹窗内容过渡动画 */
+.modal-content-transition {
+  transition: all 0.3s ease-in-out;
 }

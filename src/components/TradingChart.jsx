@@ -608,9 +608,26 @@ const TradingChart = ({ data, currentPrice, activeTrades, chartType = 'candlesti
       // 检查买入点是否还在显示范围内（基于90秒历史范围）
       const tradeTimeFromStart = tradeStartTime - (now - timeSpan);
 
-      // 如果买入时间已经超出历史范围，整个交易都不显示
-      if (tradeTimeFromStart < 0) {
-        return;
+      // 如果买入时间已经超出历史范围，买入点不显示，但结算信息可能还要显示
+      const shouldShowBuyPoint = tradeTimeFromStart >= 0;
+
+      // 定义交易状态变量
+      const isSettled = trade.settled;
+
+      // 如果交易已结算，检查结算信息是否应该显示
+      if (isSettled) {
+        const settlementTimeFromStart = trade.settlementTime - (now - timeSpan);
+        const shouldShowSettlement = settlementTimeFromStart >= 0;
+
+        // 如果买入点和结算信息都不应该显示，跳过整个交易
+        if (!shouldShowBuyPoint && !shouldShowSettlement) {
+          return;
+        }
+      } else {
+        // 如果交易未结算且买入点不应该显示，跳过
+        if (!shouldShowBuyPoint) {
+          return;
+        }
       }
 
       // 修复：计算买入点在实时价格历史轨迹上的准确位置
@@ -635,35 +652,32 @@ const TradingChart = ({ data, currentPrice, activeTrades, chartType = 'candlesti
         };
       }
 
-      // 计算买入点在图表上的位置
-      const timeFromStart = closestPoint.time - (now - timeSpan);
-      if (timeFromStart < 0) return; // 如果交易时间太早，不在显示范围内
+      // 只有在应该显示买入点时才绘制买入点
+      if (shouldShowBuyPoint) {
+        // 计算买入点在图表上的位置
+        const timeFromStart = closestPoint.time - (now - timeSpan);
+        const timeProgress = timeFromStart / timeSpan;
+        const startX = timeProgress * historyZoneWidth;
 
-      const timeProgress = timeFromStart / timeSpan;
-      const startX = timeProgress * historyZoneWidth;
+        // 买入点Y坐标：使用实际的交易价格
+        const actualEntryPrice = closestPoint.price;
+        const entryPriceY = chartTop + chartHeight - ((actualEntryPrice - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
 
-      // 买入点Y坐标：使用实际的交易价格
-      const actualEntryPrice = closestPoint.price;
-      const entryPriceY = chartTop + chartHeight - ((actualEntryPrice - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight;
+        // 绘制买入点标记 - 更精致的设计
+        const isUp = trade.direction === 'up';
+        const isWin = trade.result === 'win';
 
-      // 绘制买入点标记 - 更精致的设计
-      const isUp = trade.direction === 'up';
-      const isSettled = trade.settled;
-      const isWin = trade.result === 'win';
+        // 根据交易状态选择颜色（使用新的颜色方案）
+        let mainColor;
+        if (isSettled) {
+          // 已结算：显示输赢状态
+          mainColor = isWin ? '#10D184' : '#BD2338';
+        } else {
+          // 进行中：显示方向
+          mainColor = isUp ? '#10D184' : '#BD2338';
+        }
 
-      // 根据交易状态选择颜色（使用新的颜色方案）
-      let mainColor;
-      if (isSettled) {
-        // 已结算：显示输赢状态
-        mainColor = isWin ? '#10D184' : '#BD2338';
-      } else {
-        // 进行中：显示方向
-        mainColor = isUp ? '#10D184' : '#BD2338';
-      }
-
-
-
-      // 买入点使用固定大小，缩小一半
+        // 买入点使用固定大小，缩小一半
       const baseRadius = 6;
 
       // 计算结算线位置 - 从最右边开始向左移动，按秒为单位
@@ -783,40 +797,31 @@ const TradingChart = ({ data, currentPrice, activeTrades, chartType = 'candlesti
         ctx.fill();
         ctx.stroke();
       }
+      } // 结束 shouldShowBuyPoint 的 if 语句
 
       // 如果交易已结算，在折线图上显示结算信息
       if (isSettled) {
-        console.log('显示结算信息:', trade.id, 'settlementTime:', trade.settlementTime);
+        // 结算信息的消失时机：基于结算时间的90秒生命周期
+        const settlementTimeFromStart = trade.settlementTime - (now - timeSpan);
+
+        // 如果结算时间已经超出90秒历史范围，结算信息消失
+        if (settlementTimeFromStart < 0) {
+          return;
+        }
 
         // 使用已保存的结算价格，确保稳定显示不闪烁
         const settlementPrice = trade.settlementPrice || trade.entryPrice;
 
         // 计算结算点在折线图上的位置 - 使用结算时间
-        const currentTime = Date.now();
-        const historyTimeSpan = 90000; // 90秒历史数据
-        const settlementTimeFromStart = trade.settlementTime - (currentTime - historyTimeSpan);
         let settlementX;
 
-        console.log('结算时间计算:', {
-          currentTime,
-          settlementTime: trade.settlementTime,
-          settlementTimeFromStart,
-          historyTimeSpan
-        });
-
         // 如果结算时间还在历史范围内，计算准确位置
-        if (settlementTimeFromStart >= 0 && settlementTimeFromStart <= historyTimeSpan) {
-          const timeProgress = settlementTimeFromStart / historyTimeSpan;
+        if (settlementTimeFromStart >= 0 && settlementTimeFromStart <= timeSpan) {
+          const timeProgress = settlementTimeFromStart / timeSpan;
           settlementX = timeProgress * historyZoneWidth;
-          console.log('结算信息显示在:', settlementX);
-        } else if (settlementTimeFromStart < 0) {
-          // 结算时间已经超出历史范围，不显示结算信息（与买入点消失逻辑一致）
-          console.log('结算时间超出范围，不显示');
-          return;
         } else {
           // 结算时间在未来（不应该发生），默认在右边界
           settlementX = historyZoneWidth;
-          console.log('结算时间在未来，显示在右边界');
         }
 
         // Y位置：基于结算价格
