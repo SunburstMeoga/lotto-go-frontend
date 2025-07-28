@@ -27,6 +27,9 @@ const Trading = () => {
   const [chartType, setChartType] = useState('line'); // 图表类型：'candlestick' 或 'line' - 默认为折线图
   const currentPriceRef = useRef(currentPrice); // 用于在定时器中访问最新价格
   const updatePriceRef = useRef(updatePrice); // 用于在定时器中访问最新的updatePrice函数
+  const selectedTokenRef = useRef(selectedToken); // 用于在定时器中访问最新的selectedToken
+  const realTimeTokensRef = useRef(realTimeTokens); // 用于在定时器中访问最新的realTimeTokens
+  const balanceRef = useRef(balance); // 用于在定时器中访问最新的balance
 
   // Token 列表数据
   const tokenList = [
@@ -83,11 +86,27 @@ const Trading = () => {
     return generateRealisticHistoricalData(basePrice, 61, 2000);
   };
 
-  // 更新refs
+  // 更新refs - 只在组件挂载时设置一次
+  useEffect(() => {
+    updatePriceRef.current = updatePrice;
+  }, [updatePrice]);
+
+  // 更新refs，避免循环依赖
   useEffect(() => {
     currentPriceRef.current = currentPrice;
-    updatePriceRef.current = updatePrice;
-  }, [currentPrice, updatePrice]);
+  }, [currentPrice]);
+
+  useEffect(() => {
+    selectedTokenRef.current = selectedToken;
+  }, [selectedToken]);
+
+  useEffect(() => {
+    realTimeTokensRef.current = realTimeTokens;
+  }, [realTimeTokens]);
+
+  useEffect(() => {
+    balanceRef.current = balance;
+  }, [balance]);
 
   // 初始化图表数据
   useEffect(() => {
@@ -102,8 +121,8 @@ const Trading = () => {
       const change = lastPrice - prevPrice;
       const changePercent = (change / prevPrice) * 100;
 
-      // 更新价格上下文
-      updatePriceRef.current(lastPrice, change, changePercent);
+      // 不在初始化时更新价格上下文，避免渲染期间setState
+      // updatePrice会在价格更新定时器中自动调用
       currentPriceRef.current = lastPrice; // 初始化ref
 
       // 初始化BTC实时数据
@@ -224,8 +243,8 @@ const Trading = () => {
             // 1分钟到了，结算交易
             // 获取结算时的价格
             let settlementPrice;
-            if (selectedToken) {
-              settlementPrice = realTimeTokens[selectedToken.id]?.price || selectedToken.price;
+            if (selectedTokenRef.current) {
+              settlementPrice = realTimeTokensRef.current[selectedTokenRef.current.id]?.price || selectedTokenRef.current.price;
             } else {
               settlementPrice = currentPriceRef.current;
             }
@@ -250,7 +269,7 @@ const Trading = () => {
             console.log(`   - 价格变化: ${priceChange > 0 ? '+' : ''}${priceChange.toFixed(4)} (${priceChangePercent}%)`);
             console.log(`   - 交易结果: ${isWin ? '✅ 盈利' : '❌ 亏损'}`);
             console.log(`   - 盈亏金额: ${profit > 0 ? '+' : ''}$${profit}`);
-            console.log(`   - 当前余额: $${balance + profit}`);
+            console.log(`   - 当前余额: $${balanceRef.current + profit}`);
 
             return {
               ...trade,
@@ -267,7 +286,7 @@ const Trading = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentPrice, payout]);
+  }, [payout]); // 只保留payout依赖，其他都通过ref访问
 
   const handleTrade = (direction) => {
     if (tradeAmount <= 0) {
@@ -327,10 +346,12 @@ const Trading = () => {
     // 立即更新currentPriceRef为选中token的价格，确保同步
     currentPriceRef.current = tokenPrice;
 
-    // 更新价格上下文
-    const tokenData = realTimeTokens[token.id] || { price: token.price, changePercent: token.changePercent };
-    const change = tokenData.price - token.price;
-    updatePriceRef.current(tokenPrice, change, tokenData.changePercent);
+    // 使用setTimeout避免在渲染期间调用setState
+    setTimeout(() => {
+      const tokenData = realTimeTokens[token.id] || { price: token.price, changePercent: token.changePercent };
+      const change = tokenData.price - token.price;
+      updatePriceRef.current(tokenPrice, change, tokenData.changePercent);
+    }, 0);
   };
 
   // 返回 token 列表
@@ -345,7 +366,11 @@ const Trading = () => {
     // 重置为默认价格
     const defaultPrice = newChartData[newChartData.length - 1].close;
     currentPriceRef.current = defaultPrice;
-    updatePriceRef.current(defaultPrice, 0, 0);
+
+    // 使用setTimeout避免在渲染期间调用setState
+    setTimeout(() => {
+      updatePriceRef.current(defaultPrice, 0, 0);
+    }, 0);
   };
 
   // 渲染 token 列表
