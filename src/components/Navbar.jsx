@@ -64,7 +64,7 @@ const Navbar = ({ onWalletModalOpen }) => {
                 backgroundColor: 'transparent'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = 'rgba(234, 174, 54, 0.1)';
+                e.target.style.backgroundColor = 'rgba(255, 102, 0, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -85,7 +85,7 @@ const Navbar = ({ onWalletModalOpen }) => {
                 backgroundColor: 'transparent'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = 'rgba(234, 174, 54, 0.1)';
+                e.target.style.backgroundColor = 'rgba(255, 102, 0, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
