@@ -432,9 +432,7 @@ const Trading = () => {
   );
 
   return (
-    <div className="min-h-screen text-white overflow-x-hidden w-full" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
-      {/* 主要内容区域 - 添加顶部边距避免被navbar挡住 */}
-      <div className="mobile-container" style={{ paddingTop: '64px' }}>
+    <div>
 
         {/* 如果显示 token 列表 */}
         {showTokenList ? (
@@ -670,7 +668,6 @@ const Trading = () => {
             />
           </>
         )}
-      </div>
     </div>
   );
 };

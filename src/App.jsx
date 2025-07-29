@@ -12,8 +12,8 @@ function App() {
   const location = useLocation();
   const hideNavbar = ['/login', '/register'].includes(location.pathname);
 
-  // 检查是否是Trading页面
-  const isTradingPage = location.pathname === '/' || location.pathname === '/trading';
+  // 检查是否是需要全屏布局的页面
+  const isFullScreenPage = location.pathname === '/' || location.pathname === '/trading' || location.pathname === '/history' || location.pathname === '/account';
 
   // 初始化响应式设计
   useEffect(() => {
@@ -29,8 +29,8 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Trading页面使用全屏布局
-  if (isTradingPage) {
+  // 主要页面使用全屏布局
+  if (isFullScreenPage) {
     return (
       <Web3Provider>
         <PriceProvider>
@@ -38,7 +38,7 @@ function App() {
             <ChainChecker>
               <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
                 {!hideNavbar && <Navbar onWalletModalOpen={() => setShowWalletModal(true)} />}
-                <main className={hideNavbar ? '' : ''}>
+                <main className={hideNavbar ? '' : 'mobile-container'} style={{ paddingTop: hideNavbar ? '0' : '64px' }}>
                   <Outlet />
                 </main>
                 {!hideNavbar && <BottomNav />}

@@ -1,39 +1,46 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+
+// 导入图标
+import tradeIcon from '../assets/trade.png';
+import tradeActiveIcon from '../assets/trade-active.png';
+import historyIcon from '../assets/history.png';
+import historyActiveIcon from '../assets/history-active.png';
+import accountIcon from '../assets/account.png';
+import accountActiveIcon from '../assets/account-active.png';
 
 const BottomNav = () => {
   const location = useLocation();
+  const { t } = useTranslation();
 
   const navItems = [
     {
-      name: 'Trade',
+      name: t('trade'),
       path: '/trading',
-      icon: (
-        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
-      )
+      icon: tradeIcon,
+      activeIcon: tradeActiveIcon
     },
     {
-      name: 'History',
+      name: t('history'),
       path: '/history',
-      icon: (
-        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
+      icon: historyIcon,
+      activeIcon: historyActiveIcon
     },
     {
-      name: 'Account',
+      name: t('account'),
       path: '/account',
-      icon: (
-        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      )
+      icon: accountIcon,
+      activeIcon: accountActiveIcon
     }
   ];
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    // 如果是根路径或trading路径，都认为是trading页面激活
+    if (path === '/trading') {
+      return location.pathname === '/' || location.pathname === '/trading';
+    }
+    return location.pathname === path;
+  };
 
   return (
     <div
@@ -90,10 +97,18 @@ const BottomNav = () => {
             }}
           >
             <div style={{
-              marginBottom: '4px',
-              color: isActive(item.path) ? '#FF6600' : '#8f8f8f'
+              marginBottom: '4px'
             }}>
-              {item.icon}
+              <img
+                src={isActive(item.path) ? item.activeIcon : item.icon}
+                alt={item.name}
+                width="24"
+                height="24"
+                style={{ filter: 'brightness(1)' }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
             </div>
             <span style={{
               fontSize: '12px',

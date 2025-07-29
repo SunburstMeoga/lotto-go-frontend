@@ -1,9 +1,14 @@
+import { useTranslation } from 'react-i18next';
 import useScrollDirection from '../hooks/useScrollDirection';
 import { useWeb3 } from '../hooks/useWeb3';
+import logoImage from '../assets/Logo.png';
 
 const Navbar = ({ onWalletModalOpen }) => {
   // 滚动方向检测
   const { isVisible: isNavbarVisible } = useScrollDirection(30);
+
+  // 国际化
+  const { t } = useTranslation();
 
   // Web3钱包功能
   const {
@@ -28,6 +33,8 @@ const Navbar = ({ onWalletModalOpen }) => {
     }
   };
 
+
+
   return (
     <nav
         className="fixed top-0 left-0 right-0 z-50 border-b border-gray-800"
@@ -40,48 +47,27 @@ const Navbar = ({ onWalletModalOpen }) => {
         }}
       >
       <div className="mobile-container">
-        <div className="flex justify-between items-center h-16 px-4">
-          {/* Logo */}
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between h-16 px-4">
+          {/* 左侧Logo */}
+          <div className="flex items-center">
             <img
-              src="/vite.svg"
+              src={logoImage}
               alt="Logo"
-              className="w-8 h-8"
+              className="h-8"
+              onError={(e) => {
+                e.target.src = "/vite.svg";
+              }}
             />
-            <span className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-              Binary Options
-            </span>
           </div>
 
-          {/* Wallet Connection */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div
-              onClick={handleWalletClick}
-              className="px-4 py-2 rounded-lg text-sm font-normal cursor-pointer transition-all border hover:bg-opacity-10"
-              style={{
-                color: 'var(--color-text-primary)',
-                borderColor: 'var(--color-accent)',
-                backgroundColor: 'transparent'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = 'rgba(255, 102, 0, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-              }}
-            >
-              {isConnecting ? '连接中...' : account ? formatAddress(account) : '连接钱包'}
-            </div>
-          </div>
-
-          {/* 移动端也显示钱包按钮 */}
-          <div className="md:hidden">
+          {/* 右侧钱包连接按钮 */}
+          <div className="flex justify-end">
             <div
               onClick={handleWalletClick}
               className="px-3 py-2 rounded-lg text-sm font-normal cursor-pointer transition-all border"
               style={{
                 color: 'var(--color-text-primary)',
-                borderColor: 'var(--color-accent)',
+                borderColor: '#FF6600',
                 backgroundColor: 'transparent'
               }}
               onMouseEnter={(e) => {
@@ -91,7 +77,7 @@ const Navbar = ({ onWalletModalOpen }) => {
                 e.target.style.backgroundColor = 'transparent';
               }}
             >
-              {isConnecting ? '连接中...' : account ? formatAddress(account) : '连接钱包'}
+              {isConnecting ? t('connecting') : account ? formatAddress(account) : t('connectWallet')}
             </div>
           </div>
         </div>
